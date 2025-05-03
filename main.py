@@ -1,14 +1,14 @@
 import os
 import logging
-import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import traceback
 
 # === Настройки
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # или BOT_TOKEN, если в Render переменная так называется
+CHANNEL_ID = os.getenv("CHANNEL_ID")  # пример: -1001234567890
 GOOGLE_SHEET_NAME = "Посты Telegram"
 GOOGLE_SHEET_TAB = "Лист1"
 
@@ -17,7 +17,7 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 gc = gspread.authorize(credentials)
 
-# === Логгинг
+# === Логгирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,17 +41,22 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     await context.bot.send_message(chat_id=CHANNEL_ID, text=текст)
 
-                sheet.update_cell(i + 2, 3, "да")  # строка i+2 (с учётом заголовка), колонка 3
+                # Отметка "да" в таблице (i+2 потому что начинается со второй строки)
+                sheet.update_cell(i + 2, 3, "да")
                 await update.message.reply_text("✅ Пост опубликован.")
-                logger.info("Пост отправлен и отмечен как 'да'")
+                logger.info("Пост успешно опубликован.")
                 return
 
         await update.message.reply_text("🔍 Нет новых постов для публикации.")
-    except Exception as e:
-        logger.error(f"Ошибка: {e}")
-        await update.message.reply_text(f"❌ Ошибка при публикации:\n{e}")
 
-# === Запуск
+    except Exception as e:
+        logger.error("Ошибка при публикации:\n" + traceback.format_exc())
+        if hasattr(e, "message"):
+            await update.message.reply_text(f"❌ Ошибка:\n{e.message}")
+        else:
+            await update.message.reply_text(f"❌ Ошибка:\n{str(e)}")
+
+# === Запуск бота
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("post", post))
