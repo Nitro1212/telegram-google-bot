@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import traceback
 
 # === Настройки
-TOKEN = os.getenv("TELEGRAM_TOKEN")  # или BOT_TOKEN, если в Render переменная так называется
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # или BOT_TOKEN, если в Render переменная называется так
 CHANNEL_ID = os.getenv("CHANNEL_ID")  # пример: -1001234567890
 GOOGLE_SHEET_NAME = "Посты Telegram"
 GOOGLE_SHEET_TAB = "Лист1"
@@ -36,13 +36,18 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await update.message.reply_text("⚠️ Текст поста пустой.")
                     return
 
+                # Отправка в канал
                 if фото:
                     await context.bot.send_photo(chat_id=CHANNEL_ID, photo=фото, caption=текст)
                 else:
                     await context.bot.send_message(chat_id=CHANNEL_ID, text=текст)
 
-                # Отметка "да" в таблице (i+2 потому что начинается со второй строки)
-                sheet.update_cell(i + 2, 3, "да")
+                # Отметка "да" в таблице
+                try:
+                    sheet.update_cell(i + 2, 3, "да")  # строка +2 (т.к. заголовок), колонка 3 = "опубликован"
+                except Exception as upd_err:
+                    logger.warning(f"⚠️ Не удалось обновить ячейку: {upd_err}")
+
                 await update.message.reply_text("✅ Пост опубликован.")
                 logger.info("Пост успешно опубликован.")
                 return
@@ -51,10 +56,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error("Ошибка при публикации:\n" + traceback.format_exc())
-        if hasattr(e, "message"):
-            await update.message.reply_text(f"❌ Ошибка:\n{e.message}")
-        else:
-            await update.message.reply_text(f"❌ Ошибка:\n{str(e)}")
+        await update.message.reply_text(f"❌ Ошибка:\n{str(e)}")
 
 # === Запуск бота
 def main():
